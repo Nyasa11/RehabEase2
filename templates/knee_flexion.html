@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Knee Flexion & Extension Exercise</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+    #container { position: relative; }
+    video, canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      object-fit: cover;
+    }
+    #feedbackOverlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      color: white;
+      font-size: 24px;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 5px;
+    }
+    #stopBtn {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      font-size: 20px;
+      padding: 10px 20px;
+    }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/pose.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+</head>
+<body>
+  <div id="container">
+    <div id="feedbackOverlay">Initializing camera...</div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output"></canvas>
+    <button id="stopBtn">Stop Exercise</button>
+  </div>
+  
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const videoElement = document.getElementById('webcam');
+      const canvasElement = document.getElementById('output');
+      const canvasCtx = canvasElement.getContext('2d');
+      const feedbackOverlay = document.getElementById('feedbackOverlay');
+      const stopBtn = document.getElementById('stopBtn');
+      
+      let cameraActive = false;
+      let repCount = 0;
+      let stage = null;
+      let lastFeedbackTime = 0;
+      const feedbackCooldown = 3.0;
+      
+      function calculateAngle(a, b, c) {
+        const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+        let angle = Math.abs(radians * 180.0 / Math.PI);
+        return angle > 180 ? 360 - angle : angle;
+      }
+      
+      function sayAsync(message) {
+        const utterance = new SpeechSynthesisUtterance(message);
+        window.speechSynthesis.speak(utterance);
+      }
+      
+      const pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/${file}`
+      });
+      pose.setOptions({ modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+      pose.onResults(onResults);
+      
+      function onResults(results) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+        
+        let feedbackText = "";
+        let postureIsCorrect = true;
+        
+        if (results.poseLandmarks) {
+          const landmarks = results.poseLandmarks;
+          const hip = landmarks[24];
+          const knee = landmarks[26];
+          const ankle = landmarks[28];
+          
+          const kneeAngle = calculateAngle(hip, knee, ankle);
+          
+          if (kneeAngle < 90) {
+            feedbackText = "Bend your knee further back.";
+            postureIsCorrect = false;
+          } else if (kneeAngle > 180) {
+            feedbackText = "Straighten your knee more.";
+            postureIsCorrect = false;
+          }
+          
+          if (postureIsCorrect) {
+            if (kneeAngle > 160) {
+              if (stage === "bent") {
+                repCount++;
+                sayAsync(`Great job! ${repCount} reps completed.`);
+              }
+              stage = "straight";
+            } else if (kneeAngle < 110) {
+              stage = "bent";
+            }
+          }
+          
+          drawConnectors(canvasCtx, landmarks, Pose.POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+          drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
+          
+          canvasCtx.font = "30px Arial";
+          canvasCtx.fillStyle = "blue";
+          canvasCtx.fillText(`Angle: ${Math.round(kneeAngle)}`, 30, 50);
+          canvasCtx.fillText(`Reps: ${repCount}`, 30, 100);
+        }
+        
+        feedbackOverlay.innerText = feedbackText || "Good job! Keep going.";
+        canvasCtx.restore();
+      }
+      
+      async function startCamera() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+          videoElement.srcObject = stream;
+          await videoElement.play();
+          cameraActive = true;
+          feedbackOverlay.innerText = "Camera started. Processing pose...";
+          runPose();
+        } catch (error) {
+          feedbackOverlay.innerText = "Error accessing webcam: " + error.message;
+        }
+      }
+      
+      function runPose() {
+        async function poseFrame() {
+          if (!cameraActive) return;
+          await pose.send({ image: videoElement });
+          requestAnimationFrame(poseFrame);
+        }
+        poseFrame();
+      }
+      
+      stopBtn.addEventListener('click', () => {
+        cameraActive = false;
+        if (videoElement.srcObject) {
+          videoElement.srcObject.getTracks().forEach(track => track.stop());
+        }
+        feedbackOverlay.innerText = `Exercise Stopped. Total Reps: ${repCount}`;
+      });
+      
+      startCamera();
+    });
+  </script>
+</body>
+</html>

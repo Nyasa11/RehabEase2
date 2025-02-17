@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gait Analysis - Health Monitor</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: white;
+    }
+    #container {
+      position: relative;
+      width: 90%;
+      max-width: 1280px;
+      aspect-ratio: 16/9;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 20px;
+    }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+      border-radius: 20px;
+    }
+    #timerDisplay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px 30px;
+      border-radius: 50px;
+      font-size: 24px;
+      font-weight: 600;
+      color: #fff;
+      text-align: center;
+      z-index: 3;
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    #feedbackOverlay {
+      position: absolute;
+      top: 100px;
+      left: 20px;
+      z-index: 2;
+      color: white;
+      font-size: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px 25px;
+      border-radius: 15px;
+      max-width: 400px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #statsPanel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border-radius: 15px;
+      z-index: 3;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .stat {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+    #stopBtn {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      font-size: 18px;
+      padding: 12px 30px;
+      border: none;
+      background: linear-gradient(135deg, #e63946 0%, #c1121f 100%);
+      color: white;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 15px rgba(230, 57, 70, 0.3);
+    }
+    #stopBtn:hover {
+      transform: translateX(-50%) translateY(-2px);
+      box-shadow: 0 6px 20px rgba(230, 57, 70, 0.4);
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+  </style>
+  <!-- Mediapipe libraries -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/pose.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+</head>
+<body>
+  <div id="container">
+    <div class="overlay"></div>
+    <div id="timerDisplay">Initializing...</div>
+    <div id="feedbackOverlay">Initializing camera...</div>
+    <div id="statsPanel">
+      <div class="stat">Avg Weight Distribution: <span id="avgWeight">--</span></div>
+      <div class="stat">Avg Knee Angles: <span id="avgKneeAngles">--</span></div>
+      <div class="stat">Balance Score: <span id="balanceScore">--</span></div>
+    </div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output"></canvas>
+    <button id="stopBtn">End Session</button>
+  </div>
+
+  <script>
+    window.addEventListener("load", () => {
+      // Define landmark index constants
+      const LEFT_HIP = 23;
+      const RIGHT_HIP = 24;
+      const LEFT_KNEE = 25;
+      const RIGHT_KNEE = 26;
+      const LEFT_ANKLE = 27;
+      const RIGHT_ANKLE = 28;
+      const LEFT_SHOULDER = 11;
+      const RIGHT_SHOULDER = 12;
+      const LEFT_WRIST = 15;
+      const RIGHT_WRIST = 16;
+
+      /* =======================
+         Session Data & Utilities
+         ======================= */
+      function generateUUID() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+          });
+      }
+      const sessionData = {
+        session_id: generateUUID(),
+        timestamp: new Date().toLocaleString(),
+        patient_data: {
+          id: 'patient_' + generateUUID().slice(0, 8),
+          session_date: new Date().toLocaleDateString(),
+          session_time: new Date().toLocaleTimeString()
+        },
+        measurements: {
+          weight_distribution: [],
+          joint_angles: [],
+          balance_scores: [],
+          stride_metrics: []
+        },
+        feedback_events: [],
+        summary_metrics: {},
+        image_urls: []
+      };
+
+      const sessionStartTime = performance.now() / 1000;
+      let lastFeedbackTime = 0;
+      const feedbackCooldown = 2000; // milliseconds
+      let lastSnapshotTime = Date.now();
+      const snapshotInterval = 30000; // milliseconds
+
+      /* =======================
+         DOM Elements
+         ======================= */
+      const videoElement = document.getElementById("webcam");
+      const canvasElement = document.getElementById("output");
+      const canvasCtx = canvasElement.getContext("2d");
+      const feedbackOverlay = document.getElementById("feedbackOverlay");
+      const timerDisplay = document.getElementById("timerDisplay");
+      const stopBtn = document.getElementById("stopBtn");
+      const avgWeightEl = document.getElementById("avgWeight");
+      const avgKneeAnglesEl = document.getElementById("avgKneeAngles");
+      const balanceScoreEl = document.getElementById("balanceScore");
+
+      function sayAsync(message) {
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        speechSynthesis.speak(utterance);
+      }
+
+      /* =======================
+         Metric Calculation Functions
+         ======================= */
+      function calculateWeightDistribution(landmarks) {
+        const leftHip = landmarks[LEFT_HIP];
+        const rightHip = landmarks[RIGHT_HIP];
+        const leftAnkle = landmarks[LEFT_ANKLE];
+        const rightAnkle = landmarks[RIGHT_ANKLE];
+        const centerOfMass = (leftHip.x + rightHip.x) / 2;
+        const midline = (leftAnkle.x + rightAnkle.x) / 2;
+        let diff = (midline - centerOfMass) * 100;
+        let leftWeight = 50 + diff;
+        let rightWeight = 100 - leftWeight;
+        leftWeight = Math.max(0, Math.min(100, leftWeight));
+        rightWeight = Math.max(0, Math.min(100, rightWeight));
+        return { left: leftWeight, right: rightWeight };
+      }
+
+      function angleBetweenPoints(a, b, c) {
+        const ab = [a.x - b.x, a.y - b.y];
+        const cb = [c.x - b.x, c.y - b.y];
+        const dot = ab[0] * cb[0] + ab[1] * cb[1];
+        const normAb = Math.hypot(ab[0], ab[1]);
+        const normCb = Math.hypot(cb[0], cb[1]);
+        if (normAb * normCb === 0) return 0;
+        let cosine = dot / (normAb * normCb);
+        cosine = Math.max(-1, Math.min(1, cosine));
+        return Math.acos(cosine) * (180 / Math.PI);
+      }
+
+      function calculateJointAngles(landmarks) {
+        const leftHip = landmarks[LEFT_HIP];
+        const leftKnee = landmarks[LEFT_KNEE];
+        const leftAnkle = landmarks[LEFT_ANKLE];
+        const leftKneeAngle = angleBetweenPoints(leftHip, leftKnee, leftAnkle);
+        const rightHip = landmarks[RIGHT_HIP];
+        const rightKnee = landmarks[RIGHT_KNEE];
+        const rightAnkle = landmarks[RIGHT_ANKLE];
+        const rightKneeAngle = angleBetweenPoints(rightHip, rightKnee, rightAnkle);
+        return { left_knee: leftKneeAngle, right_knee: rightKneeAngle };
+      }
+
+      function calculateBalanceScore(landmarks) {
+        const jointAngles = calculateJointAngles(landmarks);
+        const deviation = Math.abs(jointAngles.left_knee - 180) + Math.abs(jointAngles.right_knee - 180);
+        const overallScore = Math.max(0, 100 - deviation * 0.5);
+        return { overall_score: overallScore };
+      }
+
+      function calculateStrideMetrics(landmarks) {
+        return { stride_length: 0, cadence: 0 };
+      }
+
+      function checkPostureIssues(metrics, landmarks) {
+        let issues = [];
+        let criticalMetrics = {};
+
+        const leftWeight = metrics.weight_distribution.left;
+        const rightWeight = metrics.weight_distribution.right;
+        const weightDiff = Math.abs(leftWeight - rightWeight);
+        if (weightDiff > 20) {
+          issues.push("Distribute your weight evenly");
+          criticalMetrics.weight_difference = weightDiff.toFixed(1) + "%";
+        }
+
+        const leftShoulder = landmarks[LEFT_SHOULDER];
+        const rightShoulder = landmarks[RIGHT_SHOULDER];
+        const shoulderDiff = Math.abs(leftShoulder.y - rightShoulder.y);
+        if (shoulderDiff > 0.1) {
+          issues.push("Keep your posture correct (shoulders level)");
+          criticalMetrics.shoulder_diff = shoulderDiff.toFixed(2);
+        }
+
+        const jointAngles = metrics.joint_angles;
+        ['left', 'right'].forEach(side => {
+          const angle = jointAngles[side + '_knee'];
+          if (angle < 160) {
+            issues.push(`Don't bend your ${side} knee too much`);
+            criticalMetrics[side + '_knee_angle'] = angle.toFixed(1) + "°";
+          } else if (angle > 195) {
+            issues.push(`Straighten your ${side} knee`);
+            criticalMetrics[side + '_knee_angle'] = angle.toFixed(1) + "°";
+          }
+        });
+
+        const leftWristPos = landmarks[LEFT_WRIST];
+        const rightWristPos = landmarks[RIGHT_WRIST];
+        const leftHipPos = landmarks[LEFT_HIP];
+        const rightHipPos = landmarks[RIGHT_HIP];
+        if (Math.abs(leftWristPos.y - leftHipPos.y) > 0.1) {
+          issues.push("Keep your left hand on your thigh");
+          criticalMetrics.left_hand_position = Math.abs(leftWristPos.y - leftHipPos.y).toFixed(2);
+        }
+        if (Math.abs(rightWristPos.y - rightHipPos.y) > 0.1) {
+          issues.push("Keep your right hand on your thigh");
+          criticalMetrics.right_hand_position = Math.abs(rightWristPos.y - rightHipPos.y).toFixed(2);
+        }
+
+        if (issues.length > 0) {
+          return { feedback: issues.join(" | "), metrics: criticalMetrics };
+        } else {
+          return { feedback: "Good posture", metrics: {} };
+        }
+      }
+
+      function formatMetricsForFirebase(metrics) {
+        const timestamp = new Date().toLocaleString();
+        return {
+          timestamp: timestamp,
+          weight_distribution: {
+            left: parseFloat(metrics.weight_distribution.left),
+            right: parseFloat(metrics.weight_distribution.right)
+          },
+          joint_angles: {
+            left_knee: parseFloat(metrics.joint_angles.left_knee),
+            right_knee: parseFloat(metrics.joint_angles.right_knee)
+          },
+          balance: {
+            overall_score: parseFloat(metrics.balance.overall_score)
+          },
+          stride_metrics: {
+            stride_length: parseFloat(metrics.stride_metrics.stride_length),
+            cadence: parseFloat(metrics.stride_metrics.cadence)
+          }
+        };
+      }
+
+      function displayMetrics(ctx, metrics) {
+        let y = 30;
+        ctx.save();
+        ctx.font = "20px Segoe UI";
+        ctx.fillStyle = "yellow";
+        for (const category in metrics) {
+          let text = category + ": ";
+          if (typeof metrics[category] === "object") {
+            for (const key in metrics[category]) {
+              let val = metrics[category][key];
+              text += key + "=" + (val.toFixed ? val.toFixed(1) : val) + "  ";
+            }
+          } else {
+            text += metrics[category];
+          }
+          ctx.fillText(text, 10, y);
+          y += 25;
+        }
+        ctx.restore();
+      }
+
+      function updateStatsPanel() {
+        const wd = sessionData.measurements.weight_distribution;
+        const ja = sessionData.measurements.joint_angles;
+        const bs = sessionData.measurements.balance_scores;
+        if (wd.length > 0) {
+          const avgLeft = wd.reduce((sum, val) => sum + val.left, 0) / wd.length;
+          const avgRight = wd.reduce((sum, val) => sum + val.right, 0) / wd.length;
+          avgWeightEl.textContent = `Left: ${avgLeft.toFixed(1)}%, Right: ${avgRight.toFixed(1)}%`;
+        }
+        if (ja.length > 0) {
+          const avgLeftKnee = ja.reduce((sum, val) => sum + val.left_knee, 0) / ja.length;
+          const avgRightKnee = ja.reduce((sum, val) => sum + val.right_knee, 0) / ja.length;
+          avgKneeAnglesEl.textContent = `Left: ${avgLeftKnee.toFixed(1)}°, Right: ${avgRightKnee.toFixed(1)}°`;
+        }
+        if (bs.length > 0) {
+          const avgBalance = bs.reduce((sum, val) => sum + val.overall_score, 0) / bs.length;
+          balanceScoreEl.textContent = avgBalance.toFixed(1);
+        }
+      }
+
+      /* =======================
+         Image & Session Saving Functions
+         ======================= */
+      function saveFeedbackImage(feedbackData) {
+        const dataURL = canvasElement.toDataURL("image/jpeg");
+        const timestamp = new Date().toISOString();
+        const imageId = Math.random().toString(36).substring(2, 10);
+        const feedbackEvent = {
+          timestamp: timestamp,
+          image_id: imageId,
+          image_data: dataURL,
+          feedback: feedbackData.feedback,
+          metrics: feedbackData.metrics
+        };
+        sessionData.feedback_events.push(feedbackEvent);
+      }
+
+      function saveRegularSnapshot() {
+        const dataURL = canvasElement.toDataURL("image/jpeg");
+        sessionData.image_urls.push(dataURL);
+      }
+
+      function saveFinalSessionData() {
+        const duration = (performance.now() / 1000) - sessionStartTime;
+        const wd = sessionData.measurements.weight_distribution;
+        const ja = sessionData.measurements.joint_angles;
+        const bs = sessionData.measurements.balance_scores;
+        let avgWeight = {};
+        if (wd.length > 0) {
+          avgWeight = {
+            left: wd.reduce((sum, val) => sum + val.left, 0) / wd.length,
+            right: wd.reduce((sum, val) => sum + val.right, 0) / wd.length
+          };
+        }
+        let avgJointAngles = {};
+        if (ja.length > 0) {
+          avgJointAngles = {
+            left_knee: ja.reduce((sum, val) => sum + val.left_knee, 0) / ja.length,
+            right_knee: ja.reduce((sum, val) => sum + val.right_knee, 0) / ja.length
+          };
+        }
+        let avgBalance = {};
+        if (bs.length > 0) {
+          avgBalance = {
+            overall_score: bs.reduce((sum, val) => sum + val.overall_score, 0) / bs.length
+          };
+        }
+        sessionData.summary_metrics = {
+          total_frames: sessionData.measurements.weight_distribution.length,
+          average_weight_distribution: avgWeight,
+          average_joint_angles: avgJointAngles,
+          average_balance_score: avgBalance,
+          feedback_events_count: sessionData.feedback_events.length,
+          session_duration_seconds: duration
+        };
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(sessionData, null, 4));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "session_data_" + sessionData.session_id + ".json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+      }
+
+      /* =======================
+         Camera & Pose Setup
+         ======================= */
+      async function startCamera() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+          videoElement.srcObject = stream;
+          await videoElement.play();
+          feedbackOverlay.innerText = "Camera ready! Starting gait analysis...";
+          sayAsync("Starting gait analysis session");
+        } catch (err) {
+          feedbackOverlay.innerText = "Error accessing camera: " + err.message;
+          console.error("Camera error:", err);
+        }
+      }
+
+      // Create Pose instance using the global Pose
+      const pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/${file}`
+      });
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        smoothSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      pose.onResults(onResults);
+
+      let cameraActive = false;
+      let animationFrameId = null;
+      async function runPose() {
+        if (!cameraActive) return;
+        await pose.send({ image: videoElement });
+        animationFrameId = requestAnimationFrame(runPose);
+      }
+
+      function onResults(results) {
+        const now = Date.now();
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        if (results.poseLandmarks) {
+          // Draw pose landmarks using drawing utils from the global scope
+          window.drawConnectors(canvasCtx, results.poseLandmarks, Pose.POSE_CONNECTIONS, { color: "#FFFFFF", lineWidth: 3 });
+          window.drawLandmarks(canvasCtx, results.poseLandmarks, { color: "#FF0000", lineWidth: 2, radius: 5 });
+          const landmarks = results.poseLandmarks;
+
+          const weight_distribution = calculateWeightDistribution(landmarks);
+          const joint_angles = calculateJointAngles(landmarks);
+          const balance = calculateBalanceScore(landmarks);
+          const stride_metrics = calculateStrideMetrics(landmarks);
+          const currentMetrics = { weight_distribution, joint_angles, balance, stride_metrics };
+          const formattedMetrics = formatMetricsForFirebase(currentMetrics);
+
+          sessionData.measurements.weight_distribution.push(formattedMetrics.weight_distribution);
+          sessionData.measurements.joint_angles.push(formattedMetrics.joint_angles);
+          sessionData.measurements.balance_scores.push(formattedMetrics.balance);
+          sessionData.measurements.stride_metrics.push(formattedMetrics.stride_metrics);
+
+          if (now - lastFeedbackTime >= feedbackCooldown) {
+            const feedbackData = checkPostureIssues(currentMetrics, landmarks);
+            if (feedbackData.feedback !== "Good posture") {
+              saveFeedbackImage(feedbackData);
+              sayAsync(feedbackData.feedback);
+            }
+            lastFeedbackTime = now;
+          }
+
+          if (now - lastSnapshotTime >= snapshotInterval) {
+            saveRegularSnapshot();
+            lastSnapshotTime = now;
+          }
+
+          displayMetrics(canvasCtx, currentMetrics);
+          updateStatsPanel();
+        } else {
+          canvasCtx.font = "24px Segoe UI";
+          canvasCtx.fillStyle = "red";
+          canvasCtx.fillText("No body detected.", 30, 50);
+        }
+        canvasCtx.restore();
+      }
+
+      /* =======================
+         Start & Stop Handling
+         ======================= */
+      (async () => {
+        await startCamera();
+        cameraActive = true;
+        runPose();
+      })();
+
+      stopBtn.addEventListener("click", () => {
+        cameraActive = false;
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        if (videoElement.srcObject) {
+          videoElement.srcObject.getTracks().forEach(track => track.stop());
+        }
+        feedbackOverlay.innerHTML = `
+          <h2>Session Complete!</h2>
+          <p>Total Frames: ${sessionData.measurements.weight_distribution.length}</p>
+          <p>Feedback Events: ${sessionData.feedback_events.length}</p>
+        `;
+        sayAsync("Analysis complete");
+        saveFinalSessionData();
+        timerDisplay.innerText = "Session stopped";
+      });
+    });
+  </script>
+</body>
+</html>

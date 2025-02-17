@@ -1,0 +1,349 @@
+<!-- templates/elbow_flexion.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Elbow Flexion & Extension Exercise</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    video, canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #feedbackOverlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      color: white;
+      font-size: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 12px 16px;
+      border-radius: 5px;
+      max-width: 400px;
+    }
+    #sideInfo {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      color: white;
+      font-size: 18px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px 12px;
+      border-radius: 5px;
+    }
+    #stopBtn {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      font-size: 20px;
+      padding: 10px 20px;
+      border: none;
+      background-color: #dc3545;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #stopBtn:hover {
+      background-color: #c82333;
+    }
+  </style>
+  <!-- Load MediaPipe Pose and Drawing Utils -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/pose.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+</head>
+<body>
+  <div id="container">
+    <div id="feedbackOverlay">Initializing camera...</div>
+    <div id="sideInfo"></div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output"></canvas>
+    <button id="stopBtn">Stop Exercise</button>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1) Grab the "side" parameter (?side=left or right)
+      const urlParams = new URLSearchParams(window.location.search);
+      const side = urlParams.get('side') || 'left';
+      
+      // 2) Show which elbow side was chosen
+      const sideInfo = document.getElementById('sideInfo');
+      sideInfo.innerText = `Elbow side: ${side}`;
+
+      // 3) Basic checks for MediaPipe libraries
+      if (typeof Pose === 'undefined') {
+        console.error("Error: Pose is not defined. Check the Pose script URL.");
+        document.getElementById('feedbackOverlay').innerText = "Error: Pose not loaded.";
+        return;
+      }
+      if (typeof drawConnectors === 'undefined' || typeof drawLandmarks === 'undefined') {
+        console.error("Error: Drawing utils not defined. Check the drawing utils script URL.");
+        document.getElementById('feedbackOverlay').innerText = "Error: Drawing utils not loaded.";
+        return;
+      }
+
+      // 4) Element references
+      const videoElement = document.getElementById('webcam');
+      const canvasElement = document.getElementById('output');
+      const canvasCtx = canvasElement.getContext('2d');
+      const feedbackOverlay = document.getElementById('feedbackOverlay');
+      const stopBtn = document.getElementById('stopBtn');
+
+      // 5) State variables
+      let cameraActive = false;
+      let animationFrameId = null;
+
+      let repCount = 0;
+      let stage = null; // "up" or "down"
+      let timesOfEachRep = [];
+
+      let startTime = Date.now() / 1000; // in seconds
+      let totalPausedTime = 0.0;
+      let inError = false;
+      let errorStartTime = null;
+
+      let lastFeedbackTime = 0.0;
+      const feedbackCooldown = 3.0; // seconds
+
+      // 6) Helper function: Calculate angle between three points
+      function calculateAngle(a, b, c) {
+        const radians = Math.atan2(c.y - b.y, c.x - b.x)
+                      - Math.atan2(a.y - b.y, a.x - b.x);
+        let angle = Math.abs(radians * 180.0 / Math.PI);
+        if (angle > 180) angle = 360 - angle;
+        return angle;
+      }
+
+      // 7) Voice feedback using Web Speech API
+      function sayAsync(message) {
+        const utterance = new SpeechSynthesisUtterance(message);
+        speechSynthesis.speak(utterance);
+      }
+
+      // 8) Initialize MediaPipe Pose
+      const pose = new Pose({
+        locateFile: (file) => {
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/${file}`;
+        }
+      });
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        smoothSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      pose.onResults(onResults);
+
+      // 9) The main callback for each processed frame
+      async function onResults(results) {
+        // Match canvas size to video
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        let feedbackText = "";
+        let feedbackColor = "white";
+        let postureIsCorrect = true;
+
+        if (results.poseLandmarks) {
+          const landmarks = results.poseLandmarks;
+
+          // Key landmarks for left side
+          const leftShoulder = landmarks[11];
+          const leftElbow = landmarks[13];
+          const leftWrist = landmarks[15];
+          // Right shoulder for alignment check
+          const rightShoulder = landmarks[12];
+
+          // Calculate elbow angle
+          const elbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
+
+          // A) Error Check: Elbow Angle
+          if (elbowAngle < 20 || elbowAngle > 180) {
+            postureIsCorrect = false;
+            feedbackText = "Incorrect posture. Please correct your posture.";
+            feedbackColor = "red";
+            const currentTime = Date.now() / 1000;
+            if ((currentTime - lastFeedbackTime) > feedbackCooldown) {
+              sayAsync("Incorrect posture. Please correct your posture.");
+              lastFeedbackTime = currentTime;
+            }
+          }
+
+          // B) Error Check: Elbow Alignment
+          if (Math.abs(leftShoulder.x - leftElbow.x) > 0.15) {
+            postureIsCorrect = false;
+            feedbackText = "Keep your elbow close to your body.";
+            feedbackColor = "red";
+            const currentTime = Date.now() / 1000;
+            if ((currentTime - lastFeedbackTime) > feedbackCooldown) {
+              sayAsync("Keep your elbow close to your body.");
+              lastFeedbackTime = currentTime;
+            }
+          }
+
+          // C) Error Check: Shoulder Alignment
+          if (Math.abs(leftShoulder.y - rightShoulder.y) > 0.1) {
+            postureIsCorrect = false;
+            if (feedbackText) {
+              feedbackText += " And keep your shoulders level.";
+            } else {
+              feedbackText = "Keep your shoulders level.";
+            }
+            feedbackColor = "red";
+            const currentTime = Date.now() / 1000;
+            if ((currentTime - lastFeedbackTime) > feedbackCooldown) {
+              sayAsync("Keep your shoulders level.");
+              lastFeedbackTime = currentTime;
+            }
+          }
+
+          // D) Rep Counting State Machine (only if posture is correct)
+          if (postureIsCorrect) {
+            // Extended position
+            if (elbowAngle > 160) {
+              if (stage === "up") {
+                repCount += 1;
+                timesOfEachRep.push(Date.now() / 1000);
+
+                // Every 5 reps, give feedback
+                if (repCount % 5 === 0) {
+                  sayAsync(`Great job! You have completed ${repCount} reps. Keep going!`);
+                }
+                // Special message at 10 reps
+                if (repCount === 10) {
+                  sayAsync(`Congratulations! You have completed 10 reps.`);
+                }
+              }
+              stage = "down";
+            }
+            // Flexed position
+            else if (elbowAngle < 50) {
+              stage = "up";
+            }
+          }
+
+          // Draw landmarks
+          drawConnectors(canvasCtx, landmarks, Pose.POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+          drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 2 });
+
+          // Show angle
+          canvasCtx.font = "20px Arial";
+          canvasCtx.fillStyle = "blue";
+          canvasCtx.fillText(`Angle: ${Math.round(elbowAngle)}`, 30, 50);
+        }
+
+        // E) Posture Feedback
+        if (postureIsCorrect) {
+          if (!feedbackText) {
+            feedbackText = "You're doing great! Keep going.";
+            feedbackColor = "green";
+          }
+          if (inError) {
+            inError = false;
+            if (errorStartTime !== null) {
+              totalPausedTime += (Date.now() / 1000) - errorStartTime;
+              errorStartTime = null;
+            }
+          }
+        } else {
+          if (!inError) {
+            inError = true;
+            errorStartTime = Date.now() / 1000;
+          }
+        }
+
+        // Display rep count
+        canvasCtx.font = "20px Arial";
+        canvasCtx.fillStyle = "blue";
+        canvasCtx.fillText(`Reps: ${repCount}`, 30, 80);
+
+        // Display feedback text
+        canvasCtx.font = "20px Arial";
+        canvasCtx.fillStyle = feedbackColor;
+        canvasCtx.fillText(feedbackText, 30, 110);
+
+        canvasCtx.restore();
+      }
+
+      // 10) Start the webcam
+      async function startCamera() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          videoElement.srcObject = stream;
+          await videoElement.play();
+          cameraActive = true;
+          feedbackOverlay.innerText = "Camera started. Processing pose...";
+          runPose();
+        } catch (error) {
+          console.error("Error accessing webcam:", error);
+          feedbackOverlay.innerText = "Error accessing webcam: " + error.message;
+        }
+      }
+
+      function runPose() {
+        async function poseFrame() {
+          if (!cameraActive) return;
+          await pose.send({ image: videoElement });
+          animationFrameId = requestAnimationFrame(poseFrame);
+        }
+        poseFrame();
+      }
+
+      // 11) Stop Exercise
+      stopBtn.addEventListener('click', () => {
+        cameraActive = false;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+        if (videoElement.srcObject) {
+          videoElement.srcObject.getTracks().forEach(track => track.stop());
+        }
+
+        // Performance metrics
+        if (repCount > 0 && timesOfEachRep.length > 0) {
+          const lastRepTime = timesOfEachRep[timesOfEachRep.length - 1];
+          const totalTime = lastRepTime - startTime - totalPausedTime;
+          const avgTimePerRep = totalTime / repCount;
+          console.log("===== PERFORMANCE METRICS =====");
+          console.log(`Total Reps: ${repCount}`);
+          console.log(`Active Exercise Time: ${totalTime.toFixed(2)} seconds (excludes paused time)`);
+          console.log(`Average Time Per Rep: ${avgTimePerRep.toFixed(2)} seconds`);
+          feedbackOverlay.innerText = `Exercise Stopped.\nTotal Reps: ${repCount}\nAvg Time/Rep: ${avgTimePerRep.toFixed(2)}s`;
+        } else {
+          console.log("No reps completed.");
+          feedbackOverlay.innerText = "Exercise Stopped. No reps completed.";
+        }
+      });
+
+      // Auto-start camera
+      startCamera();
+    });
+  </script>
+</body>
+</html>
+
+
+

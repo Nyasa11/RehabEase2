@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Single Leg Stand Sideways - Instructions</title>
+    <style>
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #F1F8E9;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #2E7D32;
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+        }
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        .instruction-box, .video-box, .safety-note, .metrics-box {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+        }
+        .instruction-box h2, .video-box h2, .safety-note h2, .metrics-box h2 {
+            color: #2E7D32;
+            margin-top: 0;
+            text-align: center;
+            font-size: 1.8rem;
+        }
+        .instruction-box p, .safety-note p, .metrics-box p {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        .instruction-box p:before, .safety-note p:before, .metrics-box p:before {
+            content: "\2022";
+            color: #2E7D32;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+        .safety-note {
+            background-color: #FFF3E0;
+            border-left: 6px solid #FF9800;
+        }
+        .metrics-box {
+            background-color: #E8F5E9;
+            border-left: 6px solid #2E7D32;
+        }
+        iframe {
+            width: 100%;
+            aspect-ratio: 16/9;
+            border-radius: 10px;
+            border: none;
+        }
+        .button-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .btn {
+            background: #2E7D32;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .btn:hover {
+            background: #1B5E20;
+        }
+        @media (max-width: 768px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Single Leg Stand Sideways</h1>
+        
+        <div class="content-grid">
+            <div class="instruction-box">
+                <h2>Instructions</h2>
+                <p>Stand with your feet shoulder-width apart.</p>
+                <p>Shift your weight to one leg and lift the other leg sideways.</p>
+                <p>Hold this position for a few seconds, then lower the leg.</p>
+                <p>Repeat with the other leg.</p>
+                <p>Keep your body upright and your core engaged.</p>
+            </div>
+            
+            <div class="video-box">
+                <h2>Reference Video</h2>
+                <iframe src="https://www.youtube.com/embed/3vdJhti9tZE?si=x4ynqwjVlFLb7Q6s" allowfullscreen></iframe>
+            </div>
+        </div>
+
+        <div class="safety-note">
+            <h2>Safety Notes</h2>
+            <p>Do not lean to the side while balancing.</p>
+            <p>If you feel unstable, use a chair or wall for support.</p>
+            <p>Stop if you feel any sharp pain in your knee or ankle.</p>
+            <p>Perform the movement slowly and in a controlled manner.</p>
+        </div>
+
+        <div class="metrics-box">
+            <h2>Exercise Metrics</h2>
+            <p>Repetitions: 3 sets of 10 reps per leg.</p>
+            <p>Hold time: 5-10 seconds per rep.</p>
+            <p>Rest time: 30 seconds between sets.</p>
+            <p>Recommended speed: Slow and controlled.</p>
+        </div>
+
+        <div class="button-row">
+            <button class="btn" onclick="window.location.href='/start-exercises/single_leg_stand?side=left'">
+                Start 
+            </button>
+            <button class="btn" onclick="window.location.href='/start-exercises/single_leg_stand?side=left'">
+                Progress
+            </button>
+            
+        </div>
+    </div>
+</body>
+</html>

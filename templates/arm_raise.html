@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Overhead Arm Raises - Fitness Trainer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: white;
+    }
+    #container {
+      position: relative;
+      width: 90%;
+      max-width: 1280px;
+      aspect-ratio: 16/9;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 20px;
+    }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+      border-radius: 20px;
+    }
+    #timerDisplay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px 30px;
+      border-radius: 50px;
+      font-size: 24px;
+      font-weight: 600;
+      color: #fff;
+      text-align: center;
+      z-index: 3;
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    #feedbackOverlay {
+      position: absolute;
+      top: 100px;
+      left: 20px;
+      z-index: 2;
+      color: white;
+      font-size: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px 25px;
+      border-radius: 15px;
+      max-width: 400px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #statsPanel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border-radius: 15px;
+      z-index: 3;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .stat {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+    #stopBtn {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      font-size: 18px;
+      padding: 12px 30px;
+      border: none;
+      background: linear-gradient(135deg, #e63946 0%, #c1121f 100%);
+      color: white;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 15px rgba(230, 57, 70, 0.3);
+    }
+    #stopBtn:hover {
+      transform: translateX(-50%) translateY(-2px);
+      box-shadow: 0 6px 20px rgba(230, 57, 70, 0.4);
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/pose.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+</head>
+<body>
+  <div id="container">
+    <div class="overlay"></div>
+    <div id="timerDisplay">Initializing...</div>
+    <div id="feedbackOverlay">Initializing camera...</div>
+    <div id="statsPanel">
+      <div class="stat">Total Reps: <span id="totalReps">0</span></div>
+      <div class="stat">Session Time: <span id="totalTime">0:00</span></div>
+    </div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output"></canvas>
+    <button id="stopBtn">End Workout</button>
+  </div>
+
+  <script>
+    window.addEventListener("load", () => {
+      /********************************************************************
+       * OVERHEAD ARM RAISES - Browser Version with Timers and Feedback
+       * (Required Hold: 5s)
+       ********************************************************************/
+
+      // Timing & Exercise parameters
+      const requiredHoldDuration = 5; // seconds to hold arms overhead
+      const postureThreshold = 0.1;   // normalized threshold for shoulder level
+      let state = "waiting";          // "waiting", "holding", "repComplete"
+      let holdStartTime = null;
+      let totalReps = 0;
+      let sessionStartTime = null;
+      let postureErrors = 0;
+
+      // Voice feedback settings
+      let lastFeedbackTime = 0;
+      const feedbackCooldown = 3000; // in milliseconds
+
+      // DOM Elements
+      const videoElement = document.getElementById("webcam");
+      const canvasElement = document.getElementById("output");
+      const canvasCtx = canvasElement.getContext("2d");
+      const timerDisplay = document.getElementById("timerDisplay");
+      const feedbackOverlay = document.getElementById("feedbackOverlay");
+      const totalRepsElement = document.getElementById("totalReps");
+      const totalTimeElement = document.getElementById("totalTime");
+      const stopBtn = document.getElementById("stopBtn");
+
+      // Voice feedback function using Web Speech API
+      function sayAsync(message) {
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        speechSynthesis.speak(utterance);
+      }
+
+      // Format time in mm:ss
+      function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      }
+
+      // Update Stats Panel
+      function updateStats() {
+        if (sessionStartTime) {
+          const elapsed = (performance.now() / 1000) - sessionStartTime;
+          totalTimeElement.textContent = formatTime(elapsed);
+        }
+        totalRepsElement.textContent = totalReps;
+      }
+
+      // Start camera
+      async function startCamera() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+          videoElement.srcObject = stream;
+          await videoElement.play();
+          sessionStartTime = performance.now() / 1000;
+          feedbackOverlay.innerText = "Camera ready! Please stand back...";
+          sayAsync("Welcome! Please stand back so I can see your full body for the overhead arm raises exercise.");
+        } catch (err) {
+          feedbackOverlay.innerText = "Error accessing camera: " + err.message;
+          console.error("Camera error:", err);
+        }
+      }
+
+      // Initialize Mediapipe Pose
+      const pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/${file}`
+      });
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        smoothSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      pose.onResults(onResults);
+
+      // Run pose detection loop
+      let cameraActive = false;
+      let animationFrameId = null;
+      async function runPose() {
+        if (!cameraActive) return;
+        await pose.send({ image: videoElement });
+        animationFrameId = requestAnimationFrame(runPose);
+      }
+
+      // Main onResults callback
+      function onResults(results) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        updateStats();
+
+        let mainFeedback = "";
+        if (results.poseLandmarks) {
+          // Draw landmarks
+          window.drawConnectors(canvasCtx, results.poseLandmarks, Pose.POSE_CONNECTIONS, { color: "#FFFFFF", lineWidth: 3 });
+          window.drawLandmarks(canvasCtx, results.poseLandmarks, { color: "#FF0000", lineWidth: 2, radius: 5 });
+
+          const landmarks = results.poseLandmarks;
+
+          // Instead of using Pose.PoseLandmark, use known indices:
+          // Left Wrist: 15, Right Wrist: 16, Nose: 0, Left Shoulder: 11, Right Shoulder: 12
+          const leftWrist = landmarks[15];
+          const rightWrist = landmarks[16];
+          const nose = landmarks[0];
+          const leftShoulder = landmarks[11];
+          const rightShoulder = landmarks[12];
+
+          // Check if arms are raised: both wrists above nose (remember: lower y value means higher on screen)
+          const armsRaised = (leftWrist.y < nose.y) && (rightWrist.y < nose.y);
+
+          // Posture check: shoulders should be level (within a threshold, note landmarks are normalized)
+          if (Math.abs(leftShoulder.y - rightShoulder.y) > postureThreshold) {
+            if (performance.now() - lastFeedbackTime > feedbackCooldown) {
+              sayAsync("Keep your shoulders level");
+              lastFeedbackTime = performance.now();
+            }
+            postureErrors++;
+            mainFeedback = "Adjust shoulder alignment";
+          }
+
+          // State machine
+          if (state === "waiting") {
+            mainFeedback = "Raise your arms overhead";
+            if (armsRaised) {
+              state = "holding";
+              holdStartTime = performance.now() / 1000;
+              sayAsync("Good, hold that position");
+            }
+          } else if (state === "holding") {
+            if (!armsRaised) {
+              state = "waiting";
+              holdStartTime = null;
+              sayAsync("Arms dropped. Please raise them overhead again");
+              mainFeedback = "Raise your arms overhead";
+            } else {
+              const holdTime = (performance.now() / 1000) - holdStartTime;
+              const remaining = Math.max(0, requiredHoldDuration - holdTime);
+              mainFeedback = `Hold for ${remaining.toFixed(1)} sec`;
+              if (holdTime >= requiredHoldDuration) {
+                totalReps++;
+                sayAsync("Great job! Now lower your arms");
+                state = "repComplete";
+              }
+            }
+          } else if (state === "repComplete") {
+            mainFeedback = "Lower your arms to reset";
+            if (!armsRaised) {
+              state = "waiting";
+            }
+          }
+        } else {
+          mainFeedback = "No pose detected";
+        }
+
+        // Display feedback on Timer Display and Feedback Overlay
+        timerDisplay.innerText = mainFeedback;
+        feedbackOverlay.innerText = mainFeedback;
+
+        canvasCtx.restore();
+      }
+
+      // Start camera and pose detection
+      (async () => {
+        await startCamera();
+        cameraActive = true;
+        runPose();
+      })();
+
+      // Stop exercise
+      stopBtn.addEventListener("click", () => {
+        cameraActive = false;
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        if (videoElement.srcObject) {
+          videoElement.srcObject.getTracks().forEach(track => track.stop());
+        }
+        const totalTime = (performance.now() / 1000) - sessionStartTime;
+        feedbackOverlay.innerHTML = `
+          <h2>Session Complete!</h2>
+          <p>Total Reps: ${totalReps}</p>
+          <p>Session Time: ${formatTime(totalTime)}</p>
+          <p>Posture Errors: ${postureErrors}</p>
+        `;
+        sayAsync("Great workout! You've completed your session successfully!");
+        timerDisplay.innerText = "Exercise stopped";
+      });
+    });
+  </script>
+</body>
+</html>

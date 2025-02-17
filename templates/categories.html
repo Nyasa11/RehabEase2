@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabEase - Categories</title>
+    <style>
+        :root {
+            --primary-color: #7CB342;
+            --secondary-color: #C5E1A5;
+            --background-color: #F1F8E9;
+            --text-color: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        .navbar {
+            background-color: var(--primary-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: var(--text-color);
+        }
+
+        .categories {
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .category-card {
+            flex: 1;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .category-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .category-image {
+            width: 200px;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .category-title {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .category-description {
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .category-button {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        .category-button:hover {
+            background-color: #689F38;
+        }
+        .logout-button {
+            background-color: transparent;
+            color: white;
+            padding: 8px 16px;
+            border: 2px solid white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .logout-button:hover {
+            background-color: white;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">RehabEase</div>
+        <div class="nav-links">
+            <a href="/home">Home</a>
+            <a href="/profile">Profile</a>
+            <button class="logout-button">Logout</button>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="header">
+            <h1>Choose Your Recovery Path</h1>
+            <p>Select a category that matches your rehabilitation needs</p>
+        </div>
+
+        <div class="categories">
+            <div class="category-card">
+                <img src="/static/21092-gait-disorders.jpg" alt="Gait and Walking" class="category-image" >
+                <h2 class="category-title">Gait And Walking</h2>
+                <p class="category-description">To improve walking patterns and mobility for safer, more comfortable movement.</p>
+                <a href="/gait" class="category-button">Get Started</a>
+            </div>
+
+            <div class="category-card">
+                <img src="/static/male-character-wrong-posture-slouched-600nw-2399982653.jpg.webp" alt="Balance And Posture Correction" class="category-image">
+                <h2 class="category-title">Balance And Posture Correction</h2>
+                <p class="category-description"> Focuses on stability and alignment to prevent falls and improve posture.</p>
+                <a href="/balance" class="category-button">Get Started</a>
+            </div>
+
+            <div class="category-card">
+                <img src="/static/medical-rehabilitation-physical-therapy-activities-physiotherapist-working-patients-cartoon-vector-illustration-white-95502853.jpg.webp" alt="Post-Surgery" class="category-image">
+                <h2 class="category-title">Flexibility And Range Of Motion</h2>
+                <p class="category-description">Exercises to enhance joint mobility and ease of movement.</p>
+                <a href="/flexibility" class="category-button">Get Started</a>
+            </div>
+
+            <div class="category-card">
+                <img src="/static/cognitive-process-psychological-mind-learning-tiny-person-concept-inner-head-thoughts-research-mental-rehabilitation-help-233198782.jpg.webp" alt="Post-Surgery" class="category-image">
+                <h2 class="category-title">Cognitive Exercises</h2>
+                <p class="category-description">Activities to improve coordination and mental agility.</p>
+                <a href="/cognitive" class="category-button">Get Started</a>
+            </div>
+            
+        </div>
+    </div>
+</body>
+</html>

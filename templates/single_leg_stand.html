@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Single Leg Side Raise - Fitness Trainer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: white;
+    }
+
+    #container {
+      position: relative;
+      width: 90%;
+      max-width: 1280px;
+      aspect-ratio: 16/9;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 20px;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.4) 100%);
+      pointer-events: none;
+      border-radius: 20px;
+    }
+
+    #timerDisplay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px 30px;
+      border-radius: 50px;
+      font-size: 24px;
+      font-weight: 600;
+      color: #fff;
+      text-align: center;
+      z-index: 3;
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #feedbackOverlay {
+      position: absolute;
+      top: 100px;
+      left: 20px;
+      z-index: 2;
+      color: white;
+      font-size: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px 25px;
+      border-radius: 15px;
+      max-width: 400px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #statsPanel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border-radius: 15px;
+      z-index: 3;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stat {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+
+    #stopBtn {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      font-size: 18px;
+      padding: 12px 30px;
+      border: none;
+      background: linear-gradient(135deg, #e63946 0%, #c1121f 100%);
+      color: white;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 15px rgba(230, 57, 70, 0.3);
+    }
+
+    #stopBtn:hover {
+      transform: translateX(-50%) translateY(-2px);
+      box-shadow: 0 6px 20px rgba(230, 57, 70, 0.4);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+  </style>
+  <!-- Load MediaPipe Pose and Drawing Utils -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/pose.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+</head>
+<body>
+  <div id="container">
+    <div class="overlay"></div>
+    <div id="timerDisplay">Initializing...</div>
+    <div id="feedbackOverlay">Initializing camera...</div>
+    <div id="statsPanel">
+      <div class="stat">Total Holds: <span id="totalHolds">0</span></div>
+      <div class="stat">Total Time: <span id="totalTime">0:00</span></div>
+    </div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output"></canvas>
+    <button id="stopBtn">End Workout</button>
+  </div>
+
+  <script>
+    window.addEventListener("load", () => {
+      /********************************************************************
+       * SINGLE LEG SIDE RAISE - Browser Version with Timers
+       * (Active Hold: 10s, Rest: 10s)
+       ********************************************************************/
+
+      // Landmark indices for BlazePose Full
+      const LEFT_HIP = 23, RIGHT_HIP = 24,
+            LEFT_KNEE = 25, RIGHT_KNEE = 26,
+            LEFT_ANKLE = 27, RIGHT_ANKLE = 28,
+            LEFT_SHOULDER = 11, RIGHT_SHOULDER = 12;
+
+      // Timing parameters
+      let activeDuration = 10; // seconds hold
+      let restDuration = 10;   // seconds rest
+      let legToRaise = "left";
+
+      // Performance metrics
+      let totalActiveHold = 0.0;
+      let successfulHolds = 0;
+      let sessionStartTime = null;
+
+      // Voice feedback settings
+      let lastErrorVoiceTime = 0.0;
+      const errorVoiceCooldown = 3.0;
+      let lastPositiveVoiceTime = 0.0;
+      const positiveVoiceInterval = 10.0;
+
+      // Timer variables
+      let activeStartTime = null;
+      let currentActiveHold = 0.0;
+      let resting = false;
+      let restStartTime = null;
+
+      // Flags
+      let cameraActive = false;
+      let animationFrameId = null;
+
+      // DOM elements
+      const videoElement = document.getElementById("webcam");
+      const canvasElement = document.getElementById("output");
+      const canvasCtx = canvasElement.getContext("2d");
+      const feedbackOverlay = document.getElementById("feedbackOverlay");
+      const timerDisplay = document.getElementById("timerDisplay");
+      const stopBtn = document.getElementById("stopBtn");
+      const totalHoldsElement = document.getElementById("totalHolds");
+      const totalTimeElement = document.getElementById("totalTime");
+
+      // Voice feedback function using Web Speech API
+      function sayAsync(message) {
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        speechSynthesis.speak(utterance);
+      }
+
+      // Posture check function (mirrors Python logic)
+      function checkLegRaise(landmarks, leg) {
+        let errorFlags = {};
+        let feedback = "";
+        let isCorrect = true;
+
+        const leftHip = landmarks[LEFT_HIP],
+              rightHip = landmarks[RIGHT_HIP],
+              leftKnee = landmarks[LEFT_KNEE],
+              rightKnee = landmarks[RIGHT_KNEE],
+              leftAnkle = landmarks[LEFT_ANKLE],
+              rightAnkle = landmarks[RIGHT_ANKLE],
+              leftShoulder = landmarks[LEFT_SHOULDER],
+              rightShoulder = landmarks[RIGHT_SHOULDER];
+
+        // Upper Body Upright Check
+        if (leftHip.y > leftKnee.y || rightHip.y > rightKnee.y) {
+          errorFlags["upright"] = "Keep your upper body upright.";
+          isCorrect = false;
+        }
+        // Shoulder Alignment Check
+        if (Math.abs(leftShoulder.y - rightShoulder.y) > 0.1) {
+          errorFlags["shoulders"] = "Keep your shoulders level.";
+          isCorrect = false;
+        }
+        // Side Leg Raise Check
+        const threshold = 0.06;
+        if (leg === "left") {
+          const distanceX = Math.abs(leftAnkle.x - leftHip.x);
+          if (distanceX < threshold) {
+            errorFlags["leg_raise"] = "Raise your left leg more to the side.";
+            isCorrect = false;
+          } else {
+            feedback = "Great form! Keep it up!";
+          }
+        } else if (leg === "right") {
+          const distanceX = Math.abs(rightAnkle.x - rightHip.x);
+          if (distanceX < threshold) {
+            errorFlags["leg_raise"] = "Raise your right leg more to the side.";
+            isCorrect = false;
+          } else {
+            feedback = "Perfect! You're doing great!";
+          }
+        }
+        if (isCorrect && !feedback) {
+          feedback = "Excellent form!";
+        }
+        return { isCorrect, feedback, errorFlags };
+      }
+
+      // Format time in mm:ss
+      function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      }
+
+      // Draw text helper
+      function drawText(ctx, text, x, y, color="white", fontSize=24) {
+        ctx.save();
+        ctx.font = `${fontSize}px "Segoe UI"`;
+        ctx.fillStyle = color;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(text, x, y);
+        ctx.restore();
+      }
+
+      // Custom drawing: white connectors, red landmarks
+      function drawCustomLandmarks(ctx, landmarks) {
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+        ctx.shadowBlur = 15;
+        window.drawConnectors(ctx, landmarks, Pose.POSE_CONNECTIONS, { color: "#FFFFFF", lineWidth: 3 });
+        window.drawLandmarks(ctx, landmarks, { color: "#FF0000", lineWidth: 2, radius: 5 });
+        ctx.shadowBlur = 0;
+      }
+
+      // Start camera
+      async function startCamera() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+          videoElement.srcObject = stream;
+          await videoElement.play();
+          cameraActive = true;
+          sessionStartTime = performance.now() / 1000;
+          feedbackOverlay.innerText = "Camera ready! Please stand back...";
+          sayAsync("Welcome! Please stand back so I can see your full body for the leg raise exercise.");
+        } catch (err) {
+          feedbackOverlay.innerText = "Error accessing camera: " + err.message;
+          console.error("Camera error:", err);
+        }
+      }
+
+      // Run pose loop
+      function runPose(pose) {
+        async function poseFrame() {
+          if (!cameraActive) return;
+          await pose.send({ image: videoElement });
+          animationFrameId = requestAnimationFrame(poseFrame);
+        }
+        poseFrame();
+      }
+
+      // Stop exercise
+      function stopExercise() {
+        cameraActive = false;
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        if (videoElement.srcObject) {
+          videoElement.srcObject.getTracks().forEach(track => track.stop());
+        }
+        const totalTime = (performance.now() / 1000) - sessionStartTime;
+        feedbackOverlay.innerHTML = `
+          <h2>Session Complete!</h2>
+          <p>Total Active Hold Time: ${totalActiveHold.toFixed(1)} seconds</p>
+          <p>Successful Holds: ${successfulHolds}</p>
+          <p>Total Workout Time: ${formatTime(totalTime)}</p>
+        `;
+        sayAsync("Great workout! You've completed your session successfully!");
+        timerDisplay.innerText = "Exercise stopped";
+      }
+
+      // Update stats panel (total holds, total time)
+      function updateStats() {
+        if (sessionStartTime) {
+          const totalTime = (performance.now() / 1000) - sessionStartTime;
+          totalHoldsElement.textContent = successfulHolds;
+          totalTimeElement.textContent = formatTime(totalTime);
+        }
+      }
+
+      // Main onResults callback
+      function onResults(results) {
+        const now = performance.now() / 1000;
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        updateStats();
+
+        // REST phase
+        if (resting) {
+          const elapsedRest = now - restStartTime;
+          const remaining = restDuration - elapsedRest;
+          if (remaining > 0) {
+            timerDisplay.innerHTML = `<span class="phase-rest pulse">Rest: ${remaining.toFixed(1)}s</span>`;
+          } else {
+            resting = false;
+            activeStartTime = null;
+            currentActiveHold = 0.0;
+            lastPositiveVoiceTime = 0.0;
+            legToRaise = (legToRaise === "left") ? "right" : "left";
+            timerDisplay.classList.remove('pulse');
+            sayAsync(`Time to raise your ${legToRaise} leg!`);
+          }
+          canvasCtx.restore();
+          return;
+        }
+
+        if (results.poseLandmarks) {
+          drawCustomLandmarks(canvasCtx, results.poseLandmarks);
+          const { isCorrect, feedback, errorFlags } = checkLegRaise(results.poseLandmarks, legToRaise);
+          let feedbackColor = "green";
+          let feedbackText = "";
+
+          if (isCorrect) {
+            feedbackText = feedback;
+            if (activeStartTime === null) {
+              activeStartTime = now;
+            } else {
+              currentActiveHold = now - activeStartTime;
+            }
+            if ((now - lastPositiveVoiceTime) > positiveVoiceInterval) {
+              sayAsync(`Good job! Keep holding your ${legToRaise} leg.`);
+              lastPositiveVoiceTime = now;
+            }
+          } else {
+            feedbackColor = "red";
+            feedbackText = Object.values(errorFlags).join(" ");
+            if ((now - lastErrorVoiceTime) > errorVoiceCooldown) {
+              for (const errMsg of Object.values(errorFlags)) {
+                sayAsync(errMsg);
+              }
+              lastErrorVoiceTime = now;
+            }
+            if (activeStartTime !== null) {
+              totalActiveHold += (now - activeStartTime);
+              activeStartTime = null;
+              currentActiveHold = 0.0;
+            }
+          }
+
+          // Display active hold timer
+          if (activeStartTime) {
+            timerDisplay.innerHTML = `<span class="phase-active">Hold Time: ${currentActiveHold.toFixed(1)}s</span>`;
+          } else {
+            timerDisplay.innerHTML = "Hold Paused";
+          }
+
+          drawText(canvasCtx, `Raise your ${legToRaise} leg to the side.`, 30, 100, "blue", 28);
+          drawText(canvasCtx, feedbackText, 30, 150, feedbackColor, 28);
+
+          // If hold time reached
+          if (activeStartTime && currentActiveHold >= activeDuration) {
+            sayAsync(`${legToRaise} leg hold complete! Rest for ${restDuration} seconds.`);
+            successfulHolds += 1;
+            totalActiveHold += currentActiveHold;
+            drawText(canvasCtx, `${legToRaise} leg hold complete!`, 30, 200, "green", 28);
+            resting = true;
+            restStartTime = now;
+          }
+        }
+        canvasCtx.restore();
+      }
+
+      // Start everything after libraries load
+      (async () => {
+        const pose = new Pose({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4/${file}`
+        });
+        pose.setOptions({
+          modelComplexity: 1,
+          smoothLandmarks: true,
+          enableSegmentation: false,
+          smoothSegmentation: false,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+        pose.onResults(onResults);
+
+        await startCamera();
+        runPose(pose, videoElement);
+      })();
+
+      stopBtn.addEventListener("click", () => {
+        stopExercise();
+      });
+    });
+  </script>
+</body>
+</html>

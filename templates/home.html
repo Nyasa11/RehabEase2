@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabEase - Rehabilitation Support</title>
+    <style>
+        :root {
+            --primary-color: #7CB342;
+            --secondary-color: #C5E1A5;
+            --background-color: #F1F8E9;
+            --text-color: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .hero {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .button-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .hero-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 30px;
+        }
+
+        .text-content {
+            max-width: 500px;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+
+        .logo-container {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .cta-button, .btn {
+            display: inline-block;
+            background-color: white;
+            color: var(--primary-color);
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
+        }
+
+        .cta-button:hover, .btn:hover {
+            transform: scale(1.05);
+            background-color: #f0f0f0;
+        }
+
+        .features {
+            display: flex;
+            justify-content: space-around;
+            background-color: white;
+            padding: 50px 0;
+            margin-top: 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-card {
+            text-align: center;
+            max-width: 300px;
+            padding: 20px;
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        #categories-btn {
+            display: none;
+        }
+
+        #logout-btn {
+            display: none;
+        }
+
+        #user-info {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .hero-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .text-content {
+                margin-bottom: 30px;
+            }
+
+            .logo-container {
+                width: 200px;
+                height: 200px;
+            }
+        }
+        .about {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 40px;
+        }
+
+        .about-content {
+            max-width: 600px;
+        }
+
+        .about h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+        .about img {
+            max-width: 400px;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <div class="button-container">
+                <button id="login-btn" class="btn" onclick="googleLogin()">Login with Google</button>
+                <a href="/categories" id="categories-btn" class="cta-button">Categories</a>
+                <button id="logout-btn" class="btn" onclick="googleLogout()">Logout</button>
+            </div>
+            
+            <div class="hero-content">
+                <div class="text-content">
+                    <h1>Welcome to RehabEase</h1>
+                    <p>Comprehensive rehabilitation support for your recovery journey.</p>
+                </div>
+                <div class="logo-container">
+                    <img src="/static/Screenshot 2025-02-04 at 9.31.10 PM-fotor-20250204213127.jpg" alt="RehabEase Logo">
+                </div>
+            </div>
+            
+            <p id="user-info"></p>
+        </div>
+
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🏋️</div>
+                <h3>Exercise Clips</h3>
+                <p>Preview guided rehabilitation exercises.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">👀</div>
+                <h3>Real-Time Monitoring</h3>
+                <p>AI-powered correction & feedback.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌍</div>
+                <h3>Elderly-Friendly UI</h3>
+                <p>Large fonts & multilingual support.</p>
+            </div>
+        </div>
+        
+        <div class="about">
+            <div class="about-content">
+                <h2>About RehabEase</h2>
+                <p>RehabEase is a comprehensive physiotherapy assistant designed to support individuals recovering from neurological and orthopedic conditions. Our AI-powered platform provides personalized rehabilitation programs, real-time tracking, and an elderly-friendly user interface to ensure a seamless and effective recovery journey.</p>
+            </div>
+            <img src="/static/Screenshot 2025-01-20 at 11.24.25 PM.png" alt="About RehabEase">
+        </div>
+    </div>
+
+    <!-- Firebase Authentication Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDmEYFQQ5tRcWVPodph3VFiM4ruOR9SOqo",
+            authDomain: "physio-dev-app.firebaseapp.com",
+            projectId: "physio-dev-app",
+            storageBucket: "physio-dev-app.firebasestorage.app",
+            messagingSenderId: "920994387671",
+            appId: "1:920994387671:web:28f8ed1c688e1a96f90292"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth();
+        const provider = new GoogleAuthProvider();
+
+        // Google Login Function
+        window.googleLogin = function () {
+            signInWithPopup(auth, provider)
+                .then((result) => {
+                    const user = result.user;
+                    document.getElementById("user-info").innerHTML = `Logged in as: ${user.displayName}`;
+                    document.getElementById("login-btn").style.display = "none";
+                    document.getElementById("logout-btn").style.display = "inline-block";
+                    document.getElementById("categories-btn").style.display = "inline-block";
+                })
+                .catch((error) => {
+                    console.error("Login Error:", error);
+                });
+        };
+
+        // Logout Function
+        window.googleLogout = function () {
+            signOut(auth).then(() => {
+                document.getElementById("user-info").innerHTML = "";
+                document.getElementById("login-btn").style.display = "inline-block";
+                document.getElementById("logout-btn").style.display = "none";
+                document.getElementById("categories-btn").style.display = "none";
+            }).catch((error) => {
+                console.error("Logout Error:", error);
+            });
+        };
+
+        // Check initial auth state
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.getElementById("user-info").innerHTML = `Logged in as: ${user.displayName}`;
+                document.getElementById("login-btn").style.display = "none";
+                document.getElementById("logout-btn").style.display = "inline-block";
+                document.getElementById("categories-btn").style.display = "inline-block";
+            } else {
+                document.getElementById("user-info").innerHTML = "";
+                document.getElementById("login-btn").style.display = "inline-block";
+                document.getElementById("logout-btn").style.display = "none";
+                document.getElementById("categories-btn").style.display = "none";
+            }
+        });
+    </script>
+</body>
+</html>

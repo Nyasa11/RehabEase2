@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exercise Complete</title>
+</head>
+<body>
+    <div class="container">
+        <h1>Exercise Complete!</h1>
+        <div class="results">
+            <h2>{{ exercise.name }} Results:</h2>
+            <p>Total Reps: {{ results.reps }}</p>
+            <p>Active Exercise Time: {{ results.active_time }} seconds</p>
+            <p>Average Time Per Rep: {{ results.avg_time_per_rep }} seconds</p>
+        </div>
+        <a href="{{ url_for('categories') }}" class="button">Back to Categories</a>
+    </div>
+</body>
+</html>

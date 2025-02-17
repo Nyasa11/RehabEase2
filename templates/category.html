@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RehabEase - Exercise Categories</title>
+    <style>
+        :root {
+            --primary-color: #7CB342;
+            --secondary-color: #C5E1A5;
+            --background-color: #F1F8E9;
+            --text-color: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .navbar {
+            background-color: var(--primary-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 20px;
+        }
+
+        .welcome-banner {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .category-card {
+            background-color: white;
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .category-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .category-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .category-title {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        .category-description {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .category-stats {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .logout-button {
+            background-color: transparent;
+            color: white;
+            padding: 8px 16px;
+            border: 2px solid white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .logout-button:hover {
+            background-color: white;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">RehabEase</div>
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/profile">Profile</a>
+            <a href="/progress">Progress</a>
+            <button class="logout-button">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="welcome-banner">
+            <h1>Exercise Categories</h1>
+            <p>Choose from our comprehensive range of rehabilitation exercises designed for your recovery journey.</p>
+        </div>
+
+        <div class="categories-grid">
+            <div class="category-card">
+                <div class="category-icon">🦿</div>
+                <h2 class="category-title">Lower Body</h2>
+                <p class="category-description">Exercises focused on improving leg strength, mobility, and balance.</p>
+                <div class="category-stats">
+                    <span>12 Exercises</span>
+                    <span>•</span>
+                    <span>Beginner Friendly</span>
+                </div>
+            </div>
+
+            <div class="category-card">
+                <div class="category-icon">💪</div>
+                <h2 class="category-title">Upper Body</h2>
+                <p class="category-description">Strengthen arms, shoulders, and improve upper body flexibility.</p>
+                <div class="category-stats">
+                    <span>15 Exercises</span>
+                    <span>•</span>
+                    <span>All Levels</span>
+                </div>
+            </div>
+
+            <div class="category-card">
+                <div class="category-icon">🧘</div>
+                <h2 class="category-title">Core & Balance</h2>
+                <p class="category-description">Build core strength and improve overall balance.</p>
+                <div class="category-stats">
+                    <span>10 Exercises</span>
+                    <span>•</span>
+                    <span>Progressive</span>
+                </div>
+            </div>
+
+            <div class="category-card">
+                <div class="category-icon">🤸</div>
+                <h2 class="category-title">Flexibility</h2>
+                <p class="category-description">Gentle stretching and mobility exercises for better range of motion.</p>
+                <div class="category-stats">
+                    <span>8 Exercises</span>
+                    <span>•</span>
+                    <span>Low Impact</span>
+                </div>
+            </div>
+
+            <div class="category-card">
+                <div class="category-icon">🏊</div>
+                <h2 class="category-title">Aqua Therapy</h2>
+                <p class="category-description">Water-based exercises for low-impact rehabilitation.</p>
+                <div class="category-stats">
+                    <span>6 Exercises</span>
+                    <span>•</span>
+                    <span>Specialized</span>
+                </div>
+            </div>
+
+            <div class="category-card">
+                <div class="category-icon">🧠</div>
+                <h2 class="category-title">Cognitive Exercise</h2>
+                <p class="category-description">Activities to improve coordination and mental agility.</p>
+                <div class="category-stats">
+                    <span>9 Exercises</span>
+                    <span>•</span>
+                    <span>Interactive</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
